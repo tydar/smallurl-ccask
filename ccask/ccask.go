@@ -105,8 +105,37 @@ func (cc CCaskClient) Get(key []byte) ([]byte, error) {
 	return resultBytes, nil
 }
 
-func (cc CCaskClient) Set(key []byte, value []byte) error {
-	return nil
+func (cc CCaskClient) SetRes(key, value []byte) (CCaskResponse, error) {
+	buf, err := cc.Set(key, value)
+	if err != nil {
+		return CCaskResponse{}, fmt.Errorf("Set: %w", err)
+	}
+
+	return UnmarshalCCaskResponse(buf)
+}
+
+func (cc CCaskClient) Set(key []byte, value []byte) ([]byte, error) {
+	cmd := NewCCaskCmdMsg(SET, key, value)
+	resultBytes := make([]byte, 1024) // smaller max size since we get short fixed messages here
+
+	cmdBytes, err := cc.cmdMarshaller(cmd)
+	if err != nil {
+		return resultBytes, fmt.Errorf("cmdMarshaller: %w", err)
+	}
+
+	written := 0
+	for n, err := cc.conn.Write(cmdBytes[written:]); written < len(cmdBytes); written += n {
+		if err != nil {
+			return resultBytes, fmt.Errorf("Write: %w", err)
+		}
+
+	}
+
+	if err := cc.receiveResponse(resultBytes); err != nil {
+		return []byte{}, fmt.Errorf("receiveResponse %w", err)
+	}
+
+	return resultBytes, nil
 }
 
 func (cc CCaskClient) receiveResponse(b []byte) error {

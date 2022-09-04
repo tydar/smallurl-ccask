@@ -14,15 +14,23 @@ func main() {
 		return
 	}
 
-	res, err := srv.GetRes([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
+	res, err := srv.SetRes([]byte{0x41, 0x42, 0x43, 0x44, 0x45}, []byte("The quick brown fox jumped over the lazy dog."))
+	if err != nil {
+		fmt.Printf("SetRes: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Set Value: %s\n", res.Value())
+
+	res, err = srv.GetRes([]byte{0x41, 0x42, 0x43, 0x44, 0x45})
 	if err != nil {
 		fmt.Printf("GetRes: %v\n", err)
 		return
 	}
 
+	fmt.Printf("Get Value: %s\n", res.Value())
+
 	if err := srv.Disconnect(); err != nil {
 		fmt.Printf("Disconnect: %v\n", err)
 	}
-
-	fmt.Printf("Value: %s", res.Value())
 }
