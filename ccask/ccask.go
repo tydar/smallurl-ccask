@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 )
 
-// TODO: add some sort of lock to the underlying conn
 // TODO: try to think about a reasonable response size limit
 //       with an eye toward the protocol as defined in ccask
+// TODO: use context.Context?
+// Maybe TODO: look into github.com/jackc/puddle for pooling
 
 var ErrBadCommand = errors.New("Unsupported command code")
 var ErrMsgTooBig = errors.New("Message too big")
@@ -29,10 +31,11 @@ type CCaskClient struct {
 
 	conn          net.Conn
 	cmdMarshaller func(CCaskCmdMsg) ([]byte, error)
+	mu            sync.Mutex
 }
 
-func NewCCaskClient(port string, domain string, maxMsgSize uint32) CCaskClient {
-	return CCaskClient{
+func NewCCaskClient(port string, domain string, maxMsgSize uint32) *CCaskClient {
+	return &CCaskClient{
 		Port:          port,
 		Domain:        domain,
 		MaxMsgSize:    maxMsgSize,
@@ -42,6 +45,8 @@ func NewCCaskClient(port string, domain string, maxMsgSize uint32) CCaskClient {
 }
 
 func (cc *CCaskClient) Connect() error {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
 	cc.cmdMarshaller = cc.CmdMarshallerFactory()
 
 	conn, err := net.Dial("tcp", cc.Domain+":"+cc.Port)
@@ -54,6 +59,8 @@ func (cc *CCaskClient) Connect() error {
 }
 
 func (cc *CCaskClient) Disconnect() error {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
 	if err := cc.conn.Close(); err != nil {
 		return fmt.Errorf("Close: %w", err)
 	}
@@ -61,7 +68,7 @@ func (cc *CCaskClient) Disconnect() error {
 	return nil
 }
 
-func (cc CCaskClient) GetRes(key []byte) (CCaskResponse, error) {
+func (cc *CCaskClient) GetRes(key []byte) (CCaskResponse, error) {
 	buf, err := cc.Get(key)
 	if err != nil {
 		return CCaskResponse{}, fmt.Errorf("Get: %w", err)
@@ -70,7 +77,10 @@ func (cc CCaskClient) GetRes(key []byte) (CCaskResponse, error) {
 	return UnmarshalCCaskResponse(buf)
 }
 
-func (cc CCaskClient) Get(key []byte) ([]byte, error) {
+func (cc *CCaskClient) Get(key []byte) ([]byte, error) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
 	cmd := NewCCaskCmdMsg(GET, key, []byte{})
 	resultBytes := make([]byte, MAX_RES_SIZE)
 
@@ -105,7 +115,7 @@ func (cc CCaskClient) Get(key []byte) ([]byte, error) {
 	return resultBytes, nil
 }
 
-func (cc CCaskClient) SetRes(key, value []byte) (CCaskResponse, error) {
+func (cc *CCaskClient) SetRes(key, value []byte) (CCaskResponse, error) {
 	buf, err := cc.Set(key, value)
 	if err != nil {
 		return CCaskResponse{}, fmt.Errorf("Set: %w", err)
@@ -114,7 +124,10 @@ func (cc CCaskClient) SetRes(key, value []byte) (CCaskResponse, error) {
 	return UnmarshalCCaskResponse(buf)
 }
 
-func (cc CCaskClient) Set(key []byte, value []byte) ([]byte, error) {
+func (cc *CCaskClient) Set(key []byte, value []byte) ([]byte, error) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
 	cmd := NewCCaskCmdMsg(SET, key, value)
 	resultBytes := make([]byte, 1024) // smaller max size since we get short fixed messages here
 
@@ -138,7 +151,7 @@ func (cc CCaskClient) Set(key []byte, value []byte) ([]byte, error) {
 	return resultBytes, nil
 }
 
-func (cc CCaskClient) receiveResponse(b []byte) error {
+func (cc *CCaskClient) receiveResponse(b []byte) error {
 	buf := make([]byte, 4)
 	n, err := io.ReadFull(cc.conn, buf)
 	if err != nil {
@@ -172,7 +185,7 @@ func (cc CCaskClient) receiveResponse(b []byte) error {
 	return nil
 }
 
-func (cc CCaskClient) CmdMarshallerFactory() func(CCaskCmdMsg) ([]byte, error) {
+func (cc *CCaskClient) CmdMarshallerFactory() func(CCaskCmdMsg) ([]byte, error) {
 	return func(cm CCaskCmdMsg) ([]byte, error) {
 		if cm.cmdCode != GET && cm.cmdCode != SET {
 			return []byte{}, fmt.Errorf("%d: %w", cm.cmdCode, ErrBadCommand)
