@@ -7,30 +7,27 @@ import (
 )
 
 func main() {
-	srv := ccask.NewCCaskClient("29456", "localhost", 1024)
+	client := ccask.NewCCaskClient("29456", "localhost", 1024)
 
-	if err := srv.Connect(); err != nil {
+	if err := client.Connect(); err != nil {
 		fmt.Printf("Connect: %v\n", err)
 		return
 	}
 
-	res, err := srv.SetRes([]byte{0x41, 0x42, 0x43, 0x44, 0x45}, []byte("The quick brown fox jumped over the lazy dog."))
-	if err != nil {
-		fmt.Printf("SetRes: %v\n", err)
+	slModel := NewShortLinkModel(client)
+	if err := slModel.SetLink("abcde", "Why is it called oven when you of in"); err != nil {
+		fmt.Printf("slModel.SetUrl: %v", err)
 		return
 	}
 
-	fmt.Printf("Set Value: %s\n", res.Value())
-
-	res, err = srv.GetRes([]byte{0x41, 0x42, 0x43, 0x44, 0x45})
+	sl, err := slModel.GetLink("abcde")
 	if err != nil {
-		fmt.Printf("GetRes: %v\n", err)
-		return
+		fmt.Printf("slModel.GetUrl: %v", err)
 	}
 
-	fmt.Printf("Get Value: %s\n", res.Value())
+	fmt.Printf("Key: %s Val: %s\n", sl.Key, sl.URL)
 
-	if err := srv.Disconnect(); err != nil {
+	if err := client.Disconnect(); err != nil {
 		fmt.Printf("Disconnect: %v\n", err)
 	}
 }
