@@ -1,0 +1,17 @@
+{{ define "head" }}
+{{ end }}
+
+{{ define "body" }}
+<h3>Shorten a link!</h3>
+<form action="/short/" method="post">
+	<label for="url">
+		Link
+		<input type="text" name="url" id="url" placeholder="Your link..." required />
+	</label>
+	<label for="key">
+		Key (e.g. the end of the short URL)
+		<input type="text" name="key" id="key" placeholder="Your shortlink key..." required />
+	</label>
+	<button type="submit">Shorten link</button>
+</form>
+{{ end }}

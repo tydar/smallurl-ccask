@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/tydar/smallurl-ccask/ccask"
 )
@@ -14,20 +15,16 @@ func main() {
 		return
 	}
 
-	slModel := NewShortLinkModel(client)
-	if err := slModel.SetLink("abcde", "Why is it called oven when you of in"); err != nil {
-		fmt.Printf("slModel.SetUrl: %v", err)
-		return
+	defer client.Disconnect()
+
+	env := NewEnv(client)
+	if err := env.AddTemplate("set", "templates/base.html", "templates/short.html"); err != nil {
+		fmt.Printf("AddTemplate: %v", err)
 	}
 
-	sl, err := slModel.GetLink("abcde")
-	if err != nil {
-		fmt.Printf("slModel.GetUrl: %v", err)
-	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", env.SetURLHandler)
+	mux.HandleFunc("/q/", env.GetURLHandler)
 
-	fmt.Printf("Key: %s Val: %s\n", sl.Key, sl.URL)
-
-	if err := client.Disconnect(); err != nil {
-		fmt.Printf("Disconnect: %v\n", err)
-	}
+	http.ListenAndServe(":8080", mux)
 }

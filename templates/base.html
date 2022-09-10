@@ -1,0 +1,23 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
+		<meta charset="utf-8">
+		{{ template "head" . }}
+	</head>
+	<body>
+		<header class="container">
+			<nav>
+				<ul>
+					<li><h2>SmallURL CCask</h2></li>
+					<li><a href="/short/">Shorten a link</a></li>
+				</ul>
+			</nav>
+		</header>
+		<main class="container">
+			{{ template "body" . }}
+		</main>
+	</body>
+</html>
+{{ end }}

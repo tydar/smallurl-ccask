@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -17,7 +18,10 @@ type Env struct {
 }
 
 func NewEnv(client *ccask.CCaskClient) *Env {
-	return &Env{shortLinks: NewShortLinkModel(client)}
+	return &Env{
+		shortLinks: NewShortLinkModel(client),
+		templates:  make(map[string]*template.Template),
+	}
 }
 
 func (e *Env) AddTemplate(key string, files ...string) error {
@@ -72,7 +76,7 @@ func (e *Env) SetURLHandler(w http.ResponseWriter, r *http.Request) {
 			Key: keyStr,
 			URL: url.String(),
 		}
-		if err := e.ExecuteTemplate("set_success", w, successData); err != nil {
+		if err := e.ExecuteTemplate("set", w, successData); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -85,9 +89,18 @@ func (e *Env) SetURLHandler(w http.ResponseWriter, r *http.Request) {
 
 func (e *Env) GetURLHandler(w http.ResponseWriter, r *http.Request) {
 	keySlice := r.URL.Path[len("/q/"):]
+	fmt.Println(keySlice)
 	if r.Method == "GET" {
 		sl, err := e.shortLinks.GetLink(keySlice)
 		if err != nil {
+			if errors.Is(err, ErrNoSuchKey) {
+				// TODO: make this render an error
+				if err := e.ExecuteTemplate("set", w, nil); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				return
+			}
 			http.Error(w, fmt.Sprintf("internal error %s", err.Error()), http.StatusInternalServerError)
 			return
 		}

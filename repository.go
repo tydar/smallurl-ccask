@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/tydar/smallurl-ccask/ccask"
 )
+
+var ErrNoSuchKey = errors.New("no such key")
 
 type ShortLinkRepository interface {
 	GetLink(key string) (ShortLink, error)
@@ -35,7 +38,7 @@ func (slm *ShortLinkModel) GetLink(key string) (ShortLink, error) {
 		retStr := string(res.Value())
 		return ShortLink{Key: key, URL: retStr}, nil
 	case ccask.GET_FAIL:
-		return ShortLink{}, nil
+		return ShortLink{}, fmt.Errorf("%w", ErrNoSuchKey)
 	default:
 		return ShortLink{}, fmt.Errorf("Invalid response type from database: %v\n", res.ResCode())
 	}
